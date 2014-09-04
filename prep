@@ -97,4 +97,4 @@ EOF
 
 #Copy the aui folder to /mnt/root for use after reboot
 mkdir /mnt/root/aui
-#cp 
+cp /root/aui/* /mnt/root/aui/ 

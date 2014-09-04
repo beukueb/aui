@@ -82,7 +82,7 @@ arch-chroot /mnt /bin/bash <<EOF
   ln -s /usr/share/zoneinfo/$timezone /etc/localtime
   hwclock --systohc --utc
   echo $myhostname > /etc/hostname
-  sed -i 's/^HOOKS="[a-z0-9 ]*block /&lvm2/ ' /etc/mkinitcpio.conf
+  sed -i 's/^HOOKS="[a-z0-9 ]*block /&lvm2 / ' /etc/mkinitcpio.conf
   mkinitcpio -p linux
   echo "Set root password"
   passwd

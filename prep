@@ -90,14 +90,14 @@ EOF
 echo "Setting up network"
 echo "By default all wired interfaces activated with dhcp"
 echo "Be sure to switch this off"
-arch-chroot /mnt /bin/bash <<'EOF'
-  for ipdev in $(ls /sys/class/net/); do
-    if [[ "$ipdev" == en* ]]; then 
-      echo $ipdev
-      systemctl enable dhcpcd@${ipdev}.service 
-    fi; 
-  done
-EOF
+ 
+for ipdev in $($RUN ls /sys/class/net/); do
+  if [[ "$ipdev" == en* ]]; then 
+    echo $ipdev
+    $RUN systemctl enable dhcpcd@${ipdev}.service 
+  fi; 
+done
+
 
 #Set root password
 echo "Set root password"

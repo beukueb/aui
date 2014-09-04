@@ -24,56 +24,56 @@ defaultLocale=nl_BE.UTF-8
 timezone=Europe/Brussels
 myhostname=ArchAUI
 
-#Script
-##Check if device is without partitions
+#Check if device is without partitions
 if [ "$(lsblk $installDev | wc -l)" -gt 2  ]; then 
    echo "prep expects a device without partitions";
    echo "This ensures that you know what you are doing!"
    exit 1
 fi
 
-##Make partitions
-###Convert an MBR or BSD disklabel disk to GPT format
+#Make partitions
+##Convert an MBR or BSD disklabel disk to GPT format
 sgdisk -o $installDev
 sgdisk -n 1:$(sgdisk -F $installDev):$(sgdisk -E $installDev) -t1:8e00 -c 1:"Linux LVM" $installDev
 sgdisk -n 2:34:$(sgdisk -E $installDev) -t2:ef02 -c 2:"BIOS Boot Partition" $installDev
 
-###Create LVM
+##Create LVM
 pvcreate ${installDev}1
 vgcreate VolGroup00 ${installDev}1
 lvcreate -L 5G VolGroup00 -n root
-####Use all remaining space for home
+###Use all remaining space for home
 lvcreate -l +100%FREE VolGroup00 -n home
 
-##Create file systems
+#Create file systems
 mkfs.ext4 /dev/VolGroup00/root
 mkfs.ext4 /dev/VolGroup00/home
 
-##Mount file systems
+#Mount file systems
 mount /dev/VolGroup00/root /mnt
 mkdir /mnt/home
 mount /dev/VolGroup00/home /home
 
-##Check if internet connection
+#Check if internet connection
 #TODO
 #if not suggest wifi-menu, ...
 
-##Mirrorlist
+#Mirrorlist
 grep -A1 $mirrorCountry /etc/pacman.d/mirrorlist | grep -v "^--$" > /tmp/country
 head -n6 /etc/pacman.d/mirrorlist > /tmp/head
 tail -n +6 /etc/pacman.d/mirrorlist > /tmp/tail
 cat /tmp/head /tmp/country /tmp/tail > /etc/pacman.d/mirrorlist
 rm /tmp/head /tmp/country /tmp/tail
 
-##Install base system
+#Install base system
 pacstrap /mnt base base-devel
 
-##fstab
+#fstab
 genfstab -U -p /mnt >> /mnt/etc/fstab
 #TODO for interactive use => $editor /mnt/etc/fstab
 
-#Setup with chroot
-arch-chroot /mnt /bin/bash <<EOF
+#General chroot setup
+RUN="arch-chroot /mnt"
+$RUN /bin/bash <<EOF
   sed -i "s/^#${localeSetting}/${localeSetting}/" /etc/locale.gen
   locale-gen
   echo LANG=${defaultLocale} > /etc/locale.conf
@@ -84,9 +84,24 @@ arch-chroot /mnt /bin/bash <<EOF
   echo $myhostname > /etc/hostname
   sed -i 's/^HOOKS="[a-z0-9 ]*block /&lvm2 / ' /etc/mkinitcpio.conf
   mkinitcpio -p linux
-  echo "Set root password"
-  passwd
 EOF
+
+#Network setup
+echo "Setting up network"
+echo "By default all wired interfaces activated with dhcp"
+echo "Be sure to switch this off"
+arch-chroot /mnt /bin/bash <<'EOF'
+  for ipdev in $(ls /sys/class/net/); do
+    if [[ "$ipdev" == en* ]]; then 
+      echo $ipdev
+      systemctl enable dhcpcd@${ipdev}.service 
+    fi; 
+  done
+EOF
+
+#Set root password
+echo "Set root password"
+arch-chroot /mnt passwd
 
 #Bootmanager
 arch-chroot /mnt /bin/bash <<EOF
@@ -98,3 +113,7 @@ EOF
 #Copy the aui folder to /mnt/root for use after reboot
 mkdir /mnt/root/aui
 cp /root/aui/* /mnt/root/aui/ 
+
+#End
+echo "If everything went well after rebooting your new system should be ready."
+echo "You can then continue with the aui follow-up scripts"

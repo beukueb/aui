@@ -74,7 +74,10 @@ graphicalEnvironment(){
   pacman --noconfirm -S gnome-icon-theme gcalctool
 
   #X11 keyboard config
-  localectl set-x11-keymap $xkbdconfig 
+  localectl set-x11-keymap $xkbdconfig
+
+  #Graphics card setup
+  graphicsCard
 }
 
 printingTools(){ #arch-wiki CUPS
@@ -177,14 +180,16 @@ aurPackages(){
 }
 
 #Advanced setup functions
-graphicsCard(){
+graphicsCard(){ #called by graphicalEnvironment
   cardIdentity=$(lspci | grep VGA)
-  if grep -q NVIDEA <<<$cardIdentity; then
+  if grep -iq NVIDIA <<<$cardIdentity; then
     pacman --noconfirm -S xf86-video-nouveau
-  elif grep -q INTEL <<<$cardIdentity; then
+  elif grep -iq INTEL <<<$cardIdentity; then
     pacman --noconfirm -S xf86-video-intel
-  elif grep -q AMD <<<$cardIdentity; then
+  elif grep -iq AMD <<<$cardIdentity; then
     pacman --noconfirm -S xf86-video-ati
+  elif grep -iq VIRTUALBOX <<<$cardIdentity; then
+    pacman --noconfirm -S virtualbox-guest-utils
   fi
   pacman --noconfirm -S xf86-input-synaptics
   pacman --noconfirm -S xorg-xbacklight

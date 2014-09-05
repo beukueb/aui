@@ -1,0 +1,258 @@
+#!/bin/bash
+
+#This script groups packages in logical units for system setup,
+#and creates a default sudo user
+
+#All available functions for the user should end with "(){"
+availableFunctions=$(grep "(){$" ${BASH_SOURCE[0]} | sed 's/(){//')
+
+#Help
+if [ "$1" == "-h" ]; then
+  echo "Usage:"
+  echo "${BASH_SOURCE[0]} all #=> will do full setup"
+  echo "-OR-"
+  echo -e "${BASH_SOURCE[0]} module [module ...] #=> choose modules\n"
+  echo "'module' can be any of the following:"
+  echo "$availableFunctions"
+  exit
+fi
+
+#Settings
+wdir=$(pwd)
+read -p "Username: " userName
+read -p "X11 keyboard config [e.g. 'be,ru pc104 ,phonetic grp:alt_caps_toggle']" xkbdconfig
+if [ "$1" == "all" ]; then read -p "Include AUR packages? [y/N]" aur; fi
+
+#X11 keyboard config info
+#localectl set-x11-keymap be,ru pc104 ,phonetic grp:alt_caps_toggle
+    #other toggle possibilities => grep "grp:.*_toggle" #/usr/share/X11/xkb/rules/base.lst
+    #if other model needed than default pc104 => localectl #list-x11-keymap-models
+    #if other variant needed for a layout => localectl #list-x11-keymap-variants [layout]
+
+##User execution
+USERUN="sudo -u $userName"
+
+##Check if user exists
+if ! id -u $userName >/dev/null 2>&1; then 
+  useradd -m -G wheel $userName
+  passwd $userName
+  read -p "Get config .dotfiles from git? [y/N]" fromGit
+  if [ "$fromGit" == "y" ]; then
+    read -p "Gir repository [e.g. beukueb/dotfiles]: " fromGit
+    pacman --noconfirm -S git
+    cd /home/$userName
+    $USERUN mkdir github
+    cd github
+    $USERUN git clone https://www.github.com/$fromGit
+    $USERUN cp */.* /home/$userName/
+    cd $wdir
+  fi
+fi
+
+#Package functions
+systemUtilities(){
+  pacman --noconfirm -S gpm #driver for mouse in console
+  pacman --noconfirm -S bash-completion htop
+  pacman --noconfirm -S p7zip unrar
+  pacman --noconfirm -S git wget
+  pacman --noconfirm -S openssh
+  pacman --noconfirm -S ttf-dejavu
+  pacman --noconfirm -S gvfs gvfs-smb ntfs-3g
+  pacman --noconfirm -S lynx #terminal browser
+}
+
+graphicalEnvironment(){
+  pacman --noconfirm -S xorg-server xorg-utils xorg-xinit xorg-xrandr
+  pacman --noconfirm -S fluxbox numlockx xcompmgr volwheel
+  pacman --noconfirm -S conky gnome-screensaver scrot
+  pacman --noconfirm -S emacs
+  pacman --noconfirm -S terminator
+  pacman --noconfirm -S chromium
+  pacman --noconfirm -S thunar 
+  pacman --noconfirm -S thunar-archive-plugin thunar-volman file-roller
+  pacman --noconfirm -S tumbler ffmpegthumbnailer #for thunar thumbnails
+  pacman --noconfirm -S gnome-icon-theme gcalctool
+
+  #X11 keyboard config
+  localectl set-x11-keymap $xkbdconfig 
+}
+
+printingTools(){ #arch-wiki CUPS
+  pacman --noconfirm -S cups cups-filters ghostscript gsfonts avahi
+  ##Drivers
+  pacman --noconfirm -S hplip sane #For GUI => python2-qt pygobject
+  pacman --noconfirm -S cups-pdf #Print to pdf
+  ##Startup
+  systemctl enable avahi-daemon.service
+  systemctl enable cups.service
+  echo "To configure printing go to http://localhost:631"
+}
+
+pythonTools(){
+  pacman --noconfirm -S ipython pyqt python-pygments
+  pacman --noconfirm -S python-pyzmq python-tornado
+  pacman --noconfirm -S python-matplotlib tk
+  pacman --noconfirm -S python-pandas python-scipy
+  pacman --noconfirm -S python-numexpr python-openpyxl1
+  pacman --noconfirm -S cython
+}
+
+scienceTools(){
+  pacman -S r tcl tk gcc-fortran
+  R <<EOF
+    #Bioconductor packages
+    source("http://bioconductor.org/biocLite.R")
+    biocLite("edgeR")
+    biocLite("preprocessCore")
+    #CRAN packages
+    install.packages("PoissonSeq")
+EOF
+}
+
+officeTools(){
+  pacman --noconfirm -S sshfs vpnc rdesktop
+  pacman --noconfirm -S gedit evince eog gimp inkscape
+  pacman --noconfirm -S libreoffice libreoffice-langpack libreoffice-nl
+  pacman --noconfirm -S kdegraphics-okular #For pdf annotations
+  pacman --noconfirm -S calibre
+}
+
+desktopPrograms(){
+  pacman --noconfirm -S texlive-most latex2rtf auctex
+  pacman --noconfirm -S keepass
+}
+
+mediaPrograms(){
+  pacman --noconfirm -S alsa-utils alsa-plugins pulseaudio
+  pacman --noconfirm -S icedtead-web-java7 flashplugin
+  pacman --noconfirm -S cdrtools # cdrkit is not usable for dvd/BD
+}
+
+webserver(){
+  pacman --noconfirm -S apache php php-apache mariadb
+  pacman --noconfirm -S python-django
+  pacman --noconfirm -S poedit
+}
+
+virtualboxInstall(){
+  pacman --noconfirm -S linux-headers linux-lts-headers
+  pacman --noconfirm -S virtualbox virtualbox-host-dkms virtualbox-host-modules
+  pacman --noconfirm -S haskell-pandoc
+}
+
+aurSetup(){
+  if ! command -v wget >/dev/null 2>&1; then systemUtilities; fi #dependency
+  pacman --noconfirm -S namcap #program to check PKGBUILD files (security)
+  cd /tmp
+  $USERUN wget https://aur.archlinux.org/packages/pa/package-query/package-query.tar.gz
+  $USERUN tar xzf package-query.tar.gz
+  cd package-query
+  $USERUN makepkg
+  pacman --noconfirm -U *.pkg.tar.xz
+  cd ..
+  $USERUN wget https://aur.archlinux.org/packages/ya/yaourt/yaourt.tar.gz
+  $USERUN tar yaourt.tar.gz
+  cd yaourt
+  $USERUN makepkg
+  pacman --noconfirm -U *.pkg.tar.xz
+  cd ..
+  rm -rf package-query* yaourt*
+  cd wdir
+}
+
+aurPackages(){
+  if [ "$aur" != "y" ]; then return; fi
+  echo "AUR packages should be carefully inspected for each package installed"
+  echo "This section therefore is not automatic and"
+  echo "requires your authorization on each step."
+  $USERUN yaourt -Sa dropbox
+  $USERUN yaourt -Sa chromium-pepper-flash
+  $USERUN yaourt -Sa ttf-ms-fonts
+  $USERUN yaourt -Sa ttf-google-fonts-git
+  $USERUN yaourt -Sa otf-source-sans-pro
+  $USERUN yaourt -Sa pymysql
+  $USERUN yaourt -Sa python-rpy2
+  $USERUN yaourt -Sa jabref
+  $USERUN yaourt -Sa ctemplate mysql-connector-c%2B%2B vsqlite%2B%2B mysql-workbench
+}
+
+#Advanced setup functions
+graphicsCard(){
+  cardIdentity=$(lspci | grep VGA)
+  if grep -q NVIDEA <<<$cardIdentity; then
+    pacman --noconfirm -S xf86-video-nouveau
+  elif grep -q INTEL <<<$cardIdentity; then
+    pacman --noconfirm -S xf86-video-intel
+  elif grep -q AMD <<<$cardIdentity; then
+    pacman --noconfirm -S xf86-video-ati
+  fi
+  pacman --noconfirm -S xf86-input-synaptics
+  pacman --noconfirm -S xorg-xbacklight
+    #Brighten up screen => xbacklight -inc 40
+    #Dim down => xbacklight -dec 40
+}
+
+firewall(){ #TODO
+  ##Add rules, e.g:
+  iptables -P FORWARD DROP
+  ##Save rules
+  iptables-save > /etc/iptables/iptables.rules
+  #Enable
+  systemctl enable iptables.service
+}
+
+timesetup(){ #TODO
+  pacman -S ntp
+  emacs /etc/ntp.conf
+    #.pool => .europe.pool
+  ntpd -qg
+  hwclock -w
+}
+
+advancedSystemSetup(){
+  ##Forwarding system messages to tty12 (^C-M-F12)
+  sed -i "s/^#ForwardToConsole=no/ForwardToConsole=yes/" /etc/systemd/journald.conf
+  sed -i "s/^#TTYPath=\/dev\/console/TTYPath=\/dev\/tty12/" /etc/systemd/journald.conf
+  sed -i "s/^#MaxLevelConsole=info/MaxLevelConsole=info/" /etc/systemd/journald.conf
+  systemctl restart systemd-journald
+
+  ##Create systemd rc.local
+  cat > /etc/systemd/system/rc-local.service <<EOF
+[Unit]
+Description=/etc/rc.local Compatibility
+ConditionPathExists=/etc/rc.local
+
+[Service]
+Type=forking
+ExecStart=/etc/rc.local start
+TimeoutSec=0
+StandardOutput=tty
+RemainAfterExit=yes
+SysVStartPriority=99
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  cat > /etc/rc.local <<EOF
+#!/bin/bash
+#Put commands here
+
+exit 0
+EOF
+  chmod +x /etc/rc.local
+  systemctl enable rc-local.service
+}
+
+#Execute requested functions
+if [ "$1" == "all" ]; then
+  for var in $availableFunctions; do $var; done
+else
+  for var in "$@"; do
+    if grep -Eq "( |^)${var}( |$)" <<<$availableFunctions; then
+      $var
+    else
+      echo "$var not available. Typo?"
+    fi
+  done
+fi

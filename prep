@@ -82,20 +82,27 @@ $RUN /bin/bash <<EOF
   ln -s /usr/share/zoneinfo/$timezone /etc/localtime
   hwclock --systohc --utc
   echo $myhostname > /etc/hostname
+  echo "blacklist pcspkr" > /etc/modprobe.d/nobeep.conf #Disable PC speaker
   sed -i 's/^HOOKS="[a-z0-9 ]*block /&lvm2 / ' /etc/mkinitcpio.conf
   mkinitcpio -p linux
 EOF
 
 #Network setup
+#TODO wireless
 echo "Setting up network"
-echo "By default all wired interfaces activated with dhcp"
-echo "Be sure to switch this off"
+echo "Choose which wired interfaces to activate with dhcp"
  
 for ipdev in $($RUN ls /sys/class/net/); do
-  if [[ "$ipdev" == en* ]]; then 
-    echo $ipdev
-    $RUN systemctl enable dhcpcd@${ipdev}.service 
-  fi; 
+    if [[ "$ipdev" == en* ]]; then 
+	echo "Activate interface $ipdev with dhcp? [y/N] "
+	read activdev
+	if [ "$activdev" == "y" ]; then
+	    $RUN systemctl enable dhcpcd@${ipdev}.service 
+	fi
+    elif [[ "$ipdev" == wl* ]]; then
+	$RUN pacman --noconfirm -S iw wpa_supplicant dialog
+	echo "After rebooting you can connect with wireless using: 'wifi-menu'"
+    fi
 done
 
 
@@ -107,6 +114,7 @@ arch-chroot /mnt passwd
 arch-chroot /mnt /bin/bash <<EOF
   pacman --noconfirm -S grub
   grub-install --target=i386-pc --recheck ${installDev}
+  pacman --noconfirm -S os-prober
   grub-mkconfig -o /boot/grub/grub.cfg
 EOF
 
@@ -115,5 +123,6 @@ mkdir /mnt/root/aui
 cp /root/aui/* /mnt/root/aui/ 
 
 #End
+umount -R /mnt
 echo "If everything went well after rebooting your new system should be ready."
 echo "You can then continue with the aui follow-up scripts"

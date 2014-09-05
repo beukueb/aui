@@ -15,18 +15,18 @@ The focus here is more a quick automatic install, where you check the scripts fi
 
 ## Basic install
 
-  loadkeys be-latin1 #Or whatever you need
-  pacman -Sy
-  pacman -S git
-  git clone https://www.github.com/beukueb/aui
-  $editor aui/prep #To customize options in the script
-  aui/prep #To execute
-  reboot
+    loadkeys be-latin1 #Or whatever you need
+    pacman -Sy
+    pacman -S git
+    git clone https://www.github.com/beukueb/aui
+    $editor aui/prep #To customize options in the script
+    aui/prep #To execute
+    reboot
 
 ## Extra packages
 
-  aui/autoSetup systemUtilities
-  aui/autoSetup -h #To see other modules you might like to install
+    aui/autoSetup systemUtilities
+    aui/autoSetup -h #To see other modules you might like to install
 
 If a certain module has programs you do not want installed, comment them out in the script.
 

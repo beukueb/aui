@@ -108,7 +108,11 @@ done
 
 #Set root password
 echo "Set root password"
-arch-chroot /mnt passwd
+$RUN passwd
+
+#Set sudoers
+$RUN sed -i 's/^## Cmnd alias specification$/## Cmnd alias specification\nCmnd_Alias SHUTDOWN=\/sbin\/shutdown -P now/' /etc/sudoers
+$RUN sed -i 's/^# %wheel ALL=(ALL) ALL$/%wheel ALL=(ALL) ALL\n%wheel ALL=NOPASSWD: SHUTDOWN/' /etc/sudoers
 
 #Bootmanager
 arch-chroot /mnt /bin/bash <<EOF

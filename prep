@@ -4,6 +4,9 @@
 #the options that need to be set or checked.
 #The filesystem format is: GPT with one big partition for LVM
 
+#Partition that uses remaining space on disk has to be last in installX arrays
+#Nested partitions should come after partitions that they are nested in
+
 #To use this script, when the root has appeared from 
 #the Arch boot cd, execute the following lines:
 #    loadkeys be-latin1 #Or whatever you need
@@ -16,6 +19,11 @@
 #Settings
 editor=vi
 installDev=/dev/sda
+installPartitions=(root swap home)
+installMounts=(/mnt swap /mnt/home) #Need to be same size as
+installSizes=(5G 1G REMAINING) #installPartitions
+installDevs=() #If no partitioning needs to be done, put corresponding
+               #devices here, e.g. (/dev/sda1 /dev/sda2 /dev/sda3)
 keymap=be-latin1
 consoleFont=lat9w-16
 mirrorCountry=Belgium
@@ -28,10 +36,25 @@ myhostname=ArchAUI
 if [ "$(lsblk $installDev | wc -l)" -gt 2  ]; then 
    echo "prep expects a device without partitions";
    echo "This ensures that you know what you are doing!"
-   exit 1
+   if [[ "${installDevs[@]}" != "" ]]; then
+       echo "You used installDevs so at least you somewhat know what you are doing"
+       read -p "Continue? C^C to exit now, enter to continue!" testContinue
+   else
+       exit 1
+   fi
 fi
 
-#Make partitions
+#Make partition scheme
+##Checks
+###Check if partition info arrays have same length
+if [[ "${#installPartitions[@]}" != "${#installMounts[@]}" || "${#installPartitions[@]}" != "${#installSizes[@]}" ]]; then
+    echo "Check your installX settings"
+    exit 1
+elif [[ "${installDevs[@]}" != "" &&  "${#installPartitions[@]}" != "${#installDevs[@]}" ]]; then
+    echo "installDevs is not empty, but does not match size of ofther installX"
+    exit 1
+fi
+
 ##Convert an MBR or BSD disklabel disk to GPT format
 sgdisk -o $installDev
 sgdisk -n 1:$(sgdisk -F $installDev):$(sgdisk -E $installDev) -t1:8e00 -c 1:"Linux LVM" $installDev
@@ -40,18 +63,26 @@ sgdisk -n 2:34:$(sgdisk -E $installDev) -t2:ef02 -c 2:"BIOS Boot Partition" $ins
 ##Create LVM
 pvcreate ${installDev}1
 vgcreate VolGroup00 ${installDev}1
-lvcreate -L 5G VolGroup00 -n root
-###Use all remaining space for home
-lvcreate -l +100%FREE VolGroup00 -n home
 
-#Create file systems
-mkfs.ext4 /dev/VolGroup00/root
-mkfs.ext4 /dev/VolGroup00/home
-
-#Mount file systems
-mount /dev/VolGroup00/root /mnt
-mkdir /mnt/home
-mount /dev/VolGroup00/home /home
+##Create partitions
+for (( i=0; i<${#installPartitions[@]}; i++ )); do
+    if [ "${installSizes[$i]}" != "REMAINING" ]; then
+	isize="-L ${installSizes[$i]}" #=>lvcreate -L 5G VolGroup00 -n root
+    else
+	isize="-l +100%FREE" #=>lvcreate -l +100%FREE VolGroup00 -n home
+    fi
+    lvcreate $isize VolGroup00 -n ${installPartitions[$i]}
+    if [ "${installPartitions[$i]}" != "swap" ]; then
+	#Create file system
+	mkfs.ext4 /dev/VolGroup00/${installPartitions[$i]}
+	#Mount file system
+	mkdir -p ${installMounts[$i]}
+	mount /dev/VolGroup00/${installPartitions[$i]} ${installMounts[$i]}
+    else
+	mkswap /dev/VolGroup00/${installPartitions[$i]}
+	swapon /dev/VolGroup00/${installPartitions[$i]}
+    fi
+done
 
 #Check if internet connection
 #TODO

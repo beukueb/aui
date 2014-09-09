@@ -106,6 +106,11 @@ elif [[ "${installDevs[@]}" != "" ]]; then
 	    #mkswap ${installDevs[$i]} #Should already be done
 	    swapon ${installDevs[$i]}
 	fi
+	if [ "${installPartitions[$i]}" == "root" -a -d  ${installMounts[$i]}/etc ]; then
+	    echo "Linux already installed on root dev ${installDevs[$i]}"
+	    echo "If you want to reinstall, first reformat root dev"
+	    exit 1
+	fi
     done
 else
     echo "Either provide installDev or installDevs"

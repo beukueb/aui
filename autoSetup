@@ -36,7 +36,7 @@ USERUN="sudo -u $userName"
 if ! id -u $userName >/dev/null 2>&1; then 
   useradd -m -G wheel $userName
   passwd $userName
-  read -p "Get config .dotfiles from git? [y/N]" fromGit
+  read -p "Get config .dotfiles from git? [y/N] " fromGit
   if [ "$fromGit" == "y" ]; then
     read -p "Gir repository [e.g. beukueb/dotfiles]: " fromGit
     pacman --noconfirm -S git
@@ -225,7 +225,7 @@ graphicsCard(){ #called by graphicalEnvironment
     #Dim down => xbacklight -dec 40
 }
 
-firewall(){ #TODO
+firewall(){
   ##Add rules file:
   cat > /etc/iptables/iptables.rules <<EOF
 # Based on https://wiki.archlinux.org/index.php/simple_stateful_firewall
@@ -258,12 +258,18 @@ EOF
   systemctl enable iptables.service
 }
 
-timesetup(){ #TODO
+timesetup(){
   pacheck ntp
-  emacs /etc/ntp.conf
-    #.pool => .europe.pool
+  echo "Special ntp server? [if not just ENTER]"
+  read -p "server ntp.UGent.be" ntpserver
+  if [ "$ntpserver" != "" ]; then
+    sed -i 's/^server/#server/' /etc/ntp.conf
+    sed -i "s/^#server 0/server ${ntpserver}\n#server 0/" /etc/ntp.conf
+  fi
   ntpd -qg
   hwclock -w
+  #Start service to check time once per boot
+  systemctl enable ntpdate.service
 }
 
 advancedSystemSetup(){

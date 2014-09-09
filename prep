@@ -17,6 +17,7 @@
 #To use this script, when the root has appeared from 
 #the Arch boot cd, execute the following lines:
 #    loadkeys be-latin1 #Or whatever you need
+#    wifi-menu #if you need to setup wifi
 #    pacman -Sy
 #    pacman -S git
 #    git clone https://www.github.com/beukueb/aui
@@ -39,6 +40,9 @@ localeSetting=nl_BE
 defaultLocale=nl_BE.UTF-8
 timezone=Europe/Brussels
 myhostname=ArchAUI
+
+#Setup questions
+read -p "Check fstab when ready? [Y/n] " fstabCheck
 
 #Check if device is without partitions
 if [ "$installDev" != "" -a "$(lsblk $installDev | wc -l)" -gt 2  ]; then 
@@ -108,10 +112,6 @@ else
     exit 1
 fi
 
-#Check if internet connection
-#TODO
-#if not suggest wifi-menu, ...
-
 #Mirrorlist
 grep -A1 $mirrorCountry /etc/pacman.d/mirrorlist | grep -v "^--$" > /tmp/country
 head -n6 /etc/pacman.d/mirrorlist > /tmp/head
@@ -124,7 +124,7 @@ pacstrap /mnt base base-devel
 
 #fstab
 genfstab -U -p /mnt >> /mnt/etc/fstab
-#TODO for interactive use => $editor /mnt/etc/fstab
+if [ "$fstabCheck" != "1" ]; then $editor /mnt/etc/fstab; fi
 
 #General chroot setup
 RUN="arch-chroot /mnt"
@@ -143,7 +143,6 @@ $RUN /bin/bash <<EOF
 EOF
 
 #Network setup
-#TODO wireless
 echo "Setting up network"
 echo "Choose which wired interfaces to activate with dhcp"
  
@@ -185,3 +184,5 @@ cp /root/aui/* /mnt/root/aui/
 umount -R /mnt
 echo "If everything went well after rebooting your new system should be ready."
 echo "You can then continue with the aui follow-up scripts"
+read -p "Continue with reboot? [ENTER or C^C if not]" continued
+reboot

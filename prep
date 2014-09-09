@@ -2,9 +2,16 @@
 #This script prepares the filesystem and is intended to be used
 #with an Arch Installation. At the beginning of the script are
 #the options that need to be set or checked.
-#The filesystem format is: GPT with one big partition for LVM
 
+#If using installDev => partitions will be created with the following 
+#filesystem format: GPT with one big partition for LVM
 #Partition that uses remaining space on disk has to be last in installX arrays
+
+#Instead, if using installDevs => partitions and filesystem formats already
+#has to be prepared before executing prep
+#the array installDevs needs to contain all the devs for the different parts
+#e.g. e.g. (/dev/sda1 /dev/sda2 /dev/sda3)
+
 #Nested partitions should come after partitions that they are nested in
 
 #To use this script, when the root has appeared from 
@@ -18,12 +25,13 @@
 
 #Settings
 editor=vi
-installDev=/dev/sda
+installDev=/dev/sda #Comment out if using installDevs
+installDevs=() #If no partitioning needs to be done, put corresponding
+               #devices here
+               #Needs to be same size as installPartitions
 installPartitions=(root swap home)
 installMounts=(/mnt swap /mnt/home) #Need to be same size as
 installSizes=(5G 1G REMAINING) #installPartitions
-installDevs=() #If no partitioning needs to be done, put corresponding
-               #devices here, e.g. (/dev/sda1 /dev/sda2 /dev/sda3)
 keymap=be-latin1
 consoleFont=lat9w-16
 mirrorCountry=Belgium
@@ -33,15 +41,14 @@ timezone=Europe/Brussels
 myhostname=ArchAUI
 
 #Check if device is without partitions
-if [ "$(lsblk $installDev | wc -l)" -gt 2  ]; then 
-   echo "prep expects a device without partitions";
-   echo "This ensures that you know what you are doing!"
-   if [[ "${installDevs[@]}" != "" ]]; then
-       echo "You used installDevs so at least you somewhat know what you are doing"
-       read -p "Continue? C^C to exit now, enter to continue!" testContinue
-   else
-       exit 1
-   fi
+if [ "$installDev" != "" -a "$(lsblk $installDev | wc -l)" -gt 2  ]; then 
+    echo "prep expects a device without partitions when using installDev";
+    echo "This ensures that you know what you are doing!"
+    exit 1
+elif [[ "$installDev" != "" && "${installDevs[@]}" != "" ]]; then
+    echo "Both installDev and installDevs have a value"
+    echo "You are not allowed to use both, comment one out!"
+    exit 1
 fi
 
 #Make partition scheme
@@ -55,34 +62,51 @@ elif [[ "${installDevs[@]}" != "" &&  "${#installPartitions[@]}" != "${#installD
     exit 1
 fi
 
-##Convert an MBR or BSD disklabel disk to GPT format
-sgdisk -o $installDev
-sgdisk -n 1:$(sgdisk -F $installDev):$(sgdisk -E $installDev) -t1:8e00 -c 1:"Linux LVM" $installDev
-sgdisk -n 2:34:$(sgdisk -E $installDev) -t2:ef02 -c 2:"BIOS Boot Partition" $installDev
+if [ "$installDev" != "" ]; then
+    ##Convert an MBR or BSD disklabel disk to GPT format
+    sgdisk -o $installDev
+    sgdisk -n 1:$(sgdisk -F $installDev):$(sgdisk -E $installDev) -t1:8e00 -c 1:"Linux LVM" $installDev
+    sgdisk -n 2:34:$(sgdisk -E $installDev) -t2:ef02 -c 2:"BIOS Boot Partition" $installDev
 
-##Create LVM
-pvcreate ${installDev}1
-vgcreate VolGroup00 ${installDev}1
+    ##Create LVM
+    pvcreate ${installDev}1
+    vgcreate VolGroup00 ${installDev}1
 
-##Create partitions
-for (( i=0; i<${#installPartitions[@]}; i++ )); do
-    if [ "${installSizes[$i]}" != "REMAINING" ]; then
-	isize="-L ${installSizes[$i]}" #=>lvcreate -L 5G VolGroup00 -n root
-    else
-	isize="-l +100%FREE" #=>lvcreate -l +100%FREE VolGroup00 -n home
-    fi
-    lvcreate $isize VolGroup00 -n ${installPartitions[$i]}
-    if [ "${installPartitions[$i]}" != "swap" ]; then
-	#Create file system
-	mkfs.ext4 /dev/VolGroup00/${installPartitions[$i]}
-	#Mount file system
-	mkdir -p ${installMounts[$i]}
-	mount /dev/VolGroup00/${installPartitions[$i]} ${installMounts[$i]}
-    else
-	mkswap /dev/VolGroup00/${installPartitions[$i]}
-	swapon /dev/VolGroup00/${installPartitions[$i]}
-    fi
-done
+    ##Create/mount partitions
+    for (( i=0; i<${#installPartitions[@]}; i++ )); do
+	if [ "${installSizes[$i]}" != "REMAINING" ]; then
+	    isize="-L ${installSizes[$i]}" #=>lvcreate -L 5G VolGroup00 -n root
+	else
+	    isize="-l +100%FREE" #=>lvcreate -l +100%FREE VolGroup00 -n home
+	fi
+	lvcreate $isize VolGroup00 -n ${installPartitions[$i]}
+	if [ "${installPartitions[$i]}" != "swap" ]; then
+	    #Create file system
+	    mkfs.ext4 /dev/VolGroup00/${installPartitions[$i]}
+	    #Mount file system
+	    mkdir -p ${installMounts[$i]}
+	    mount /dev/VolGroup00/${installPartitions[$i]} ${installMounts[$i]}
+	else
+	    mkswap /dev/VolGroup00/${installPartitions[$i]}
+	    swapon /dev/VolGroup00/${installPartitions[$i]}
+	fi
+    done
+elif [[ "${installDevs[@]}" != "" ]]; then
+    ##Only mount partitions when using installDevs
+    for (( i=0; i<${#installPartitions[@]}; i++ )); do
+	if [ "${installPartitions[$i]}" != "swap" ]; then
+	    #Mount file system
+	    mkdir -p ${installMounts[$i]}
+	    mount ${installDevs[$i]} ${installMounts[$i]}
+	else
+	    #mkswap ${installDevs[$i]} #Should already be done
+	    swapon ${installDevs[$i]}
+	fi
+    done
+else
+    echo "Either provide installDev or installDevs"
+    exit 1
+fi
 
 #Check if internet connection
 #TODO

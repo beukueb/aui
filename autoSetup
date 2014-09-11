@@ -163,12 +163,30 @@ webserver(){
   pacheck ${programs[@]}
 }
 
-virtualboxInstall(){
+virtualbox(){
   programs=(linux-headers linux-lts-headers
       virtualbox virtualbox-host-dkms virtualbox-host-modules
       haskell-pandoc
       )
   pacheck ${programs[@]}
+}
+
+arduino(){
+  pacheck libusb-compat
+  cd /home/$userName
+  $USERUN wget http://downloads.arduino.cc/arduino-nightly-linux64.tgz
+  $USERUN tar xzf arduino-nightly-linux64.tgz
+  rm arduino-nightly-linux64.tgz
+
+  #Add user to necessary groups
+  gpasswd -a $userName uucp
+  gpasswd -a $userName lock
+
+  #libtinfo dependency issue
+  cd /usr/lib
+  ln -s libncurses.so.5 libtinfo.so.5
+
+  cd $wdir
 }
 
 aurSetup(){

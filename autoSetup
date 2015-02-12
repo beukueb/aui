@@ -135,13 +135,14 @@ officeTools(){
       gedit evince eog gimp inkscape
       libreoffice libreoffice-langpack libreoffice-nl
       kdegraphics-okular #For pdf annotations
-      calibre
+      calibre pdfgrep
       )
   pacheck ${programs[@]}
 }
 
 desktopPrograms(){
   programs=(texlive-most latex2rtf auctex
+      aspell-en #english spelling dict for emacs ispell
       keepass
       )
   pacheck ${programs[@]}

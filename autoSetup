@@ -62,7 +62,7 @@ pacheck(){ #Checks and installs a packages array with pacman
 systemUtilities(){
   programs=(gpm #driver for mouse in console
       bash-completion htop p7zip unrar git wget openssh
-      ttf-dejavu gvfs gvfs-smb ntfs-3g
+      ttf-dejavu gvfs gvfs-smb ntfs-3g ipcalc
       lynx #terminal browser
       )
   pacheck ${programs[@]}

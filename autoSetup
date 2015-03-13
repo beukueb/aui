@@ -64,6 +64,7 @@ systemUtilities(){
       bash-completion htop p7zip unrar git wget openssh
       ttf-dejavu gvfs gvfs-smb ntfs-3g ipcalc
       lynx #terminal browser
+      tree #see directory tree structure
       )
   pacheck ${programs[@]}
 }

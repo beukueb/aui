@@ -142,7 +142,7 @@ officeTools(){
 }
 
 desktopPrograms(){
-  programs=(texlive-most latex2rtf auctex
+  programs=(texlive-most latex2rtf auctex texlive-langcyrillic
       aspell-en #english spelling dict for emacs ispell
       keepass
       )
